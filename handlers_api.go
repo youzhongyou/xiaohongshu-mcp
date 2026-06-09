@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/xpzouying/xiaohongshu-mcp/cookies"
@@ -278,6 +279,26 @@ func healthHandler(c *gin.Context) {
 		"account":   "ai-report",
 		"timestamp": "now",
 	}, "服务正常")
+}
+
+// downloadUserNotesHandler 下载用户所有笔记
+func (s *AppServer) downloadUserNotesHandler(c *gin.Context) {
+	var req DownloadUserNotesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST",
+			"请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xiaohongshuService.DownloadUserNotes(c.Request.Context(), req.UserID, req.XsecToken, req.WithDetail)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "DOWNLOAD_USER_NOTES_FAILED",
+			"下载用户笔记失败", err.Error())
+		return
+	}
+
+	c.Set("account", "ai-report")
+	respondSuccess(c, result, fmt.Sprintf("获取完成: 共%d条笔记", result.TotalNotes))
 }
 
 // myProfileHandler 我的信息

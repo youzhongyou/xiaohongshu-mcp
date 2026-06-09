@@ -53,6 +53,13 @@ type FilterOption struct {
 	Location    string `json:"location,omitempty" jsonschema:"位置距离: 不限|同城|附近,默认为'不限'"`
 }
 
+// DownloadUserNotesArgs 下载用户所有笔记的参数
+type DownloadUserNotesArgs struct {
+	UserID     string `json:"user_id" jsonschema:"小红书用户ID，从Feed列表获取"`
+	XsecToken  string `json:"xsec_token" jsonschema:"访问令牌，从Feed列表的xsecToken字段获取"`
+	WithDetail bool   `json:"with_detail,omitempty" jsonschema:"是否获取每篇笔记的详情内容（正文、图片等），默认false仅返回列表"`
+}
+
 // FeedDetailArgs 获取Feed详情的参数
 type FeedDetailArgs struct {
 	FeedID           string `json:"feed_id" jsonschema:"小红书笔记ID，从Feed列表获取"`
@@ -443,7 +450,23 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Infof("Registered %d MCP tools", 13)
+	// 工具 14: 下载用户所有笔记
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "download_user_notes",
+			Description: "下载指定用户的所有笔记（支持仅获取列表或含详情）。通过滚动加载获取用户全部笔记，可选逐篇获取详情内容。",
+			Annotations: &mcp.ToolAnnotations{
+				Title:        "Download User Notes",
+				ReadOnlyHint: true,
+			},
+		},
+		withPanicRecovery("download_user_notes", func(ctx context.Context, req *mcp.CallToolRequest, args DownloadUserNotesArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleDownloadUserNotes(ctx, args)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Infof("Registered %d MCP tools", 14)
 }
 
 // convertToMCPResult 将自定义的 MCPToolResult 转换为官方 SDK 的格式

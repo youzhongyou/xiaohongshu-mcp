@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 
@@ -520,6 +521,88 @@ func (s *XiaohongshuService) UnfavoriteFeed(ctx context.Context, feedID, xsecTok
 		return nil, err
 	}
 	return &ActionResult{FeedID: feedID, Success: true, Message: "取消收藏成功或未收藏"}, nil
+}
+
+// DownloadUserNotes 获取用户所有笔记及详情
+func (s *XiaohongshuService) DownloadUserNotes(ctx context.Context, userID, xsecToken string, withDetail bool) (*DownloadUserNotesResponse, error) {
+	// 第一步：获取所有笔记列表
+	b := newBrowser()
+	page := b.NewPage()
+
+	action := xiaohongshu.NewUserNotesAction(page)
+	profile, err := action.GetAllNotes(ctx, userID, xsecToken)
+
+	page.Close()
+	b.Close()
+
+	if err != nil {
+		return nil, fmt.Errorf("获取笔记列表失败: %w", err)
+	}
+
+	logrus.Infof("获取到 %d 条笔记，开始获取详情...", len(profile.Feeds))
+
+	response := &DownloadUserNotesResponse{
+		UserBasicInfo: profile.UserBasicInfo,
+		Interactions:  profile.Interactions,
+		TotalNotes:    len(profile.Feeds),
+	}
+
+	if !withDetail {
+		// 不需要详情，只返回列表
+		for _, feed := range profile.Feeds {
+			response.Notes = append(response.Notes, NoteItem{
+				ID:        feed.ID,
+				Title:     feed.NoteCard.DisplayTitle,
+				Type:      feed.NoteCard.Type,
+				XsecToken: feed.XsecToken,
+				Cover:     feed.NoteCard.Cover.URLDefault,
+				Likes:     feed.NoteCard.InteractInfo.LikedCount,
+				Collects:  feed.NoteCard.InteractInfo.CollectedCount,
+			})
+		}
+		return response, nil
+	}
+
+	// 第二步：逐篇获取详情
+	for i, feed := range profile.Feeds {
+		logrus.Infof("获取笔记详情 [%d/%d]: %s", i+1, len(profile.Feeds), feed.NoteCard.DisplayTitle)
+
+		detail, err := s.GetFeedDetail(ctx, feed.ID, feed.XsecToken, false)
+
+		noteItem := NoteItem{
+			ID:        feed.ID,
+			Title:     feed.NoteCard.DisplayTitle,
+			Type:      feed.NoteCard.Type,
+			XsecToken: feed.XsecToken,
+			Cover:     feed.NoteCard.Cover.URLDefault,
+			Likes:     feed.NoteCard.InteractInfo.LikedCount,
+			Collects:  feed.NoteCard.InteractInfo.CollectedCount,
+		}
+
+		if err != nil {
+			logrus.Warnf("获取笔记 %s 详情失败: %v", feed.ID, err)
+			noteItem.Error = err.Error()
+		} else {
+			noteItem.Detail = detail.Data
+		}
+
+		response.Notes = append(response.Notes, noteItem)
+
+		// 避免请求过快
+		if i < len(profile.Feeds)-1 {
+			time.Sleep(time.Duration(2000+rand.Intn(1000)) * time.Millisecond)
+		}
+	}
+
+	response.SuccessCount = 0
+	for _, n := range response.Notes {
+		if n.Error == "" && n.Detail != nil {
+			response.SuccessCount++
+		}
+	}
+
+	logrus.Infof("下载完成: 总计 %d, 成功 %d", response.TotalNotes, response.SuccessCount)
+	return response, nil
 }
 
 // ReplyCommentToFeed 回复指定评论

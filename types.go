@@ -109,3 +109,32 @@ type ActionResult struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 }
+
+// DownloadUserNotesRequest 下载用户所有笔记请求
+type DownloadUserNotesRequest struct {
+	UserID     string `json:"user_id" binding:"required"`
+	XsecToken  string `json:"xsec_token" binding:"required"`
+	WithDetail bool   `json:"with_detail,omitempty"`
+}
+
+// DownloadUserNotesResponse 下载用户所有笔记响应
+type DownloadUserNotesResponse struct {
+	UserBasicInfo xiaohongshu.UserBasicInfo      `json:"user_basic_info"`
+	Interactions  []xiaohongshu.UserInteractions `json:"interactions"`
+	TotalNotes    int                            `json:"total_notes"`
+	SuccessCount  int                            `json:"success_count"`
+	Notes         []NoteItem                     `json:"notes"`
+}
+
+// NoteItem 单条笔记结果
+type NoteItem struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Type      string `json:"type"`
+	XsecToken string `json:"xsec_token"`
+	Cover     string `json:"cover"`
+	Likes     string `json:"likes"`
+	Collects  string `json:"collects"`
+	Detail    any    `json:"detail,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
