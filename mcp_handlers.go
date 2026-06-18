@@ -743,6 +743,40 @@ func (s *AppServer) handleReplyComment(ctx context.Context, args map[string]inte
 	}
 }
 
+// handleSearchAuthenticReviews 搜索真实评测
+func (s *AppServer) handleSearchAuthenticReviews(ctx context.Context, args SearchAuthenticReviewsArgs) *MCPToolResult {
+	logrus.Infof("MCP: 搜索真实评测 - keyword=%s, threshold=%d, with_detail=%v", args.Keyword, args.Threshold, args.WithDetail)
+
+	result, err := s.xiaohongshuService.SearchAuthenticReviews(ctx, args.Keyword, args.Threshold, args.WithDetail)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{
+				Type: "text",
+				Text: "搜索真实评测失败: " + err.Error(),
+			}},
+			IsError: true,
+		}
+	}
+
+	jsonData, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{
+				Type: "text",
+				Text: fmt.Sprintf("搜索完成但序列化失败: %v", err),
+			}},
+			IsError: true,
+		}
+	}
+
+	return &MCPToolResult{
+		Content: []MCPContent{{
+			Type: "text",
+			Text: string(jsonData),
+		}},
+	}
+}
+
 // handleDownloadUserNotes 处理下载用户所有笔记
 func (s *AppServer) handleDownloadUserNotes(ctx context.Context, args DownloadUserNotesArgs) *MCPToolResult {
 	logrus.Infof("MCP: 下载用户笔记 - User ID: %s, with_detail=%v", args.UserID, args.WithDetail)

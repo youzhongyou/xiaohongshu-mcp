@@ -281,6 +281,30 @@ func healthHandler(c *gin.Context) {
 	}, "服务正常")
 }
 
+// searchAuthenticReviewsHandler 搜索真实评测
+func (s *AppServer) searchAuthenticReviewsHandler(c *gin.Context) {
+	var req struct {
+		Keyword    string `json:"keyword" binding:"required"`
+		Threshold  int    `json:"threshold,omitempty"`
+		WithDetail bool   `json:"with_detail,omitempty"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST",
+			"请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xiaohongshuService.SearchAuthenticReviews(c.Request.Context(), req.Keyword, req.Threshold, req.WithDetail)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "SEARCH_AUTHENTIC_REVIEWS_FAILED",
+			"搜索真实评测失败", err.Error())
+		return
+	}
+
+	c.Set("account", "ai-report")
+	respondSuccess(c, result, fmt.Sprintf("搜索完成: 真实评测%d条, 疑似广告%d条", result.AuthenticCount, result.AdCount))
+}
+
 // downloadUserNotesHandler 下载用户所有笔记
 func (s *AppServer) downloadUserNotesHandler(c *gin.Context) {
 	var req DownloadUserNotesRequest

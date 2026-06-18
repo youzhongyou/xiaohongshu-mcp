@@ -1,6 +1,9 @@
 package main
 
-import "github.com/xpzouying/xiaohongshu-mcp/xiaohongshu"
+import (
+	"github.com/xpzouying/xiaohongshu-mcp/pkg/adfilter"
+	"github.com/xpzouying/xiaohongshu-mcp/xiaohongshu"
+)
 
 // HTTP API 响应类型
 
@@ -137,4 +140,26 @@ type NoteItem struct {
 	Collects  string `json:"collects"`
 	Detail    any    `json:"detail,omitempty"`
 	Error     string `json:"error,omitempty"`
+}
+
+// AuthenticReviewsResponse 真实评测搜索响应
+type AuthenticReviewsResponse struct {
+	Keyword        string       `json:"keyword"`
+	Threshold      int          `json:"threshold"`
+	Total          int          `json:"total"`
+	AuthenticCount int          `json:"authentic_count"`
+	AdCount        int          `json:"ad_count"`
+	Authentic      []ReviewItem `json:"authentic"`
+	Ads            []ReviewItem `json:"ads"`
+}
+
+// ReviewItem 评测笔记条目
+type ReviewItem struct {
+	ID        string                 `json:"id"`
+	Title     string                 `json:"title"`
+	Author    string                 `json:"author"`
+	Likes     string                 `json:"likes"`
+	XsecToken string                 `json:"xsec_token"`
+	AdScore   int                    `json:"ad_score"`
+	AdDetails []adfilter.ScoreDetail `json:"ad_details"`
 }

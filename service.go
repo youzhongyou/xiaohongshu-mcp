@@ -14,6 +14,7 @@ import (
 	"github.com/xpzouying/xiaohongshu-mcp/browser"
 	"github.com/xpzouying/xiaohongshu-mcp/configs"
 	"github.com/xpzouying/xiaohongshu-mcp/cookies"
+	"github.com/xpzouying/xiaohongshu-mcp/pkg/adfilter"
 	"github.com/xpzouying/xiaohongshu-mcp/pkg/downloader"
 	"github.com/xpzouying/xiaohongshu-mcp/pkg/xhsutil"
 	"github.com/xpzouying/xiaohongshu-mcp/xiaohongshu"
@@ -366,6 +367,67 @@ func (s *XiaohongshuService) ListFeeds(ctx context.Context) (*FeedsListResponse,
 		Feeds: feeds,
 		Count: len(feeds),
 	}
+
+	return response, nil
+}
+
+// SearchAuthenticReviews 搜索真实评测（过滤广告）
+func (s *XiaohongshuService) SearchAuthenticReviews(ctx context.Context, keyword string, threshold int, withDetail bool) (*AuthenticReviewsResponse, error) {
+	// 搜索笔记
+	feedsResp, err := s.SearchFeeds(ctx, keyword)
+	if err != nil {
+		return nil, fmt.Errorf("搜索失败: %w", err)
+	}
+
+	if threshold <= 0 {
+		threshold = 5
+	}
+
+	response := &AuthenticReviewsResponse{
+		Keyword:   keyword,
+		Threshold: threshold,
+		Total:     feedsResp.Count,
+	}
+
+	for i, feed := range feedsResp.Feeds {
+		title := feed.NoteCard.DisplayTitle
+		desc := ""
+
+		// 获取详情正文
+		if withDetail && feed.ID != "" && feed.XsecToken != "" {
+			detail, err := s.GetFeedDetail(ctx, feed.ID, feed.XsecToken, false)
+			if err == nil && detail.Data != nil {
+				if dataMap, ok := detail.Data.(*xiaohongshu.FeedDetailResponse); ok {
+					desc = dataMap.Note.Desc
+				}
+			}
+			// 避免请求过快
+			if i < len(feedsResp.Feeds)-1 {
+				time.Sleep(time.Duration(2000+rand.Intn(1000)) * time.Millisecond)
+			}
+		}
+
+		adScore := adfilter.Calculate(title, desc)
+
+		item := ReviewItem{
+			ID:        feed.ID,
+			Title:     title,
+			Author:    feed.NoteCard.User.Nickname,
+			Likes:     feed.NoteCard.InteractInfo.LikedCount,
+			XsecToken: feed.XsecToken,
+			AdScore:   adScore.Score,
+			AdDetails: adScore.Details,
+		}
+
+		if adScore.Score <= threshold {
+			response.Authentic = append(response.Authentic, item)
+		} else {
+			response.Ads = append(response.Ads, item)
+		}
+	}
+
+	response.AuthenticCount = len(response.Authentic)
+	response.AdCount = len(response.Ads)
 
 	return response, nil
 }

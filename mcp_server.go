@@ -53,6 +53,13 @@ type FilterOption struct {
 	Location    string `json:"location,omitempty" jsonschema:"位置距离: 不限|同城|附近,默认为'不限'"`
 }
 
+// SearchAuthenticReviewsArgs 搜索真实评测的参数
+type SearchAuthenticReviewsArgs struct {
+	Keyword    string `json:"keyword" jsonschema:"搜索关键词，如'扫地机器人评测'"`
+	Threshold  int    `json:"threshold,omitempty" jsonschema:"广告评分阈值，低于此分判定为真实评测，默认5"`
+	WithDetail bool   `json:"with_detail,omitempty" jsonschema:"是否获取笔记正文再评分（更准确但更慢），默认false"`
+}
+
 // DownloadUserNotesArgs 下载用户所有笔记的参数
 type DownloadUserNotesArgs struct {
 	UserID     string `json:"user_id" jsonschema:"小红书用户ID，从Feed列表获取"`
@@ -466,7 +473,23 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Infof("Registered %d MCP tools", 14)
+	// 工具 15: 搜索真实评测
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "search_authentic_reviews",
+			Description: "搜索真实评测内容，自动过滤疑似广告（@厂家、带链接、过多hashtag/emoji、广告标识）。返回广告评分低的真实用户评测。",
+			Annotations: &mcp.ToolAnnotations{
+				Title:        "Search Authentic Reviews",
+				ReadOnlyHint: true,
+			},
+		},
+		withPanicRecovery("search_authentic_reviews", func(ctx context.Context, req *mcp.CallToolRequest, args SearchAuthenticReviewsArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleSearchAuthenticReviews(ctx, args)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Infof("Registered %d MCP tools", 15)
 }
 
 // convertToMCPResult 将自定义的 MCPToolResult 转换为官方 SDK 的格式
