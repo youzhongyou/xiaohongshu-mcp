@@ -1,4 +1,4 @@
-# 下载用户笔记使用手册
+# 小红书 MCP 工具使用手册
 
 ## 前置条件
 
@@ -140,3 +140,102 @@ curl -s --max-time 60 -X POST http://localhost:18060/api/v1/feeds/detail \
 - `detail.data.note.desc` — 笔记正文
 - `detail.data.note.imageList` — 图片列表
 - `detail.data.comments.list` — 评论列表
+
+---
+
+## 搜索真实评测（过滤广告）
+
+搜索产品评测时自动过滤疑似广告，只保留真实用户的评价。
+
+### 广告评分规则
+
+| 维度 | 检测逻辑 | 分数 |
+|------|----------|------|
+| @品牌提及 | 正文中 `@xxx` | +3/个 |
+| 含购买链接 | URL 或购买引导词 | +5 |
+| hashtag过多 | `#话题#` 数量 > 5 | +1/个（超出部分） |
+| emoji过多 | emoji 数量 > 10 | +1/个（超出部分） |
+| 广告标识 | 含"赞助""推广""合作"等 | +10 |
+
+总分 ≤ 阈值 = 真实评测，> 阈值 = 疑似广告。
+
+### 基本用法
+
+```bash
+# 快速模式（只看标题，几秒出结果）
+python3 scripts/search_authentic_reviews.py --keyword "扫地机器人评测"
+
+# 精准模式（获取正文分析，1-2分钟）
+python3 scripts/search_authentic_reviews.py --keyword "扫地机器人评测" --with-detail
+
+# 精准模式 + 抓取评论（评论中有更真实的评价）
+python3 scripts/search_authentic_reviews.py --keyword "扫地机器人评测" --with-comments
+```
+
+### 完整参数
+
+```bash
+python3 scripts/search_authentic_reviews.py \
+  --keyword "戴森吸尘器评测" \
+  --with-comments \
+  --threshold 10 \
+  --sort-by "最多评论" \
+  --delay 5 \
+  --output ~/data/xiaohongshu/reviews/戴森吸尘器.json
+```
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--keyword` | 必填 | 搜索关键词，建议加"评测""体验""避坑" |
+| `--threshold` | 5 | 广告分阈值，建议5-10（小红书用户emoji多，10更宽松） |
+| `--with-detail` | 否 | 获取正文再评分（更准确但更慢） |
+| `--with-comments` | 否 | 抓取评论（隐含with-detail），每条取前30条评论 |
+| `--sort-by` | 综合 | 排序：综合\|最新\|最多点赞\|最多评论\|最多收藏 |
+| `--delay` | 3.0 | 请求间隔秒数（避免限流） |
+| `--output` | 无 | 保存路径（自动创建目录） |
+
+### HTTP API 方式
+
+```bash
+curl -X POST http://localhost:18060/api/v1/feeds/authentic-reviews \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keyword": "扫地机器人评测",
+    "threshold": 10,
+    "with_detail": true
+  }'
+```
+
+### MCP 工具（AI 直接调用）
+
+工具名：`search_authentic_reviews`
+
+直接对 AI 说："帮我搜索扫地机器人的真实评测"，AI 会自动调用。
+
+### 输出格式
+
+每条结果包含：
+
+```json
+{
+  "id": "笔记ID",
+  "title": "标题",
+  "url": "https://www.xiaohongshu.com/explore/xxx?xsec_token=...",
+  "author": "作者",
+  "likes": "点赞数",
+  "ad_score": 0,
+  "ad_details": [],
+  "desc": "正文摘要...",
+  "comments": [
+    {"author": "用户A", "content": "评论内容...", "likes": "10"},
+    ...
+  ]
+}
+```
+
+### 搜索技巧
+
+- 关键词加"评测""真实体验""避坑""踩坑"效果更好
+- `--sort-by "最多评论"` 可以找到讨论多的帖子
+- 评论中往往有比正文更真实的反馈（用 `--with-comments`）
+- 阈值建议 10（小红书用户普遍爱用 emoji，5 太严格会误杀）
